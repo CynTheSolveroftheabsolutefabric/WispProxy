@@ -13,7 +13,7 @@ permissions:
 jobs:
   run-wisp:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 185
 
     steps:
       - name: Checkout repository
@@ -32,7 +32,7 @@ jobs:
           npm start > wisp.log 2>&1 &
           echo $! > wisp.pid
 
-      - name: Wait for server health
+      - name: Wait for Wisp health
         run: |
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:5001/health; then
@@ -45,9 +45,49 @@ jobs:
           cat wisp.log
           exit 1
 
-      - name: Stop Wisp server
+      - name: Install cloudflared
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            --output cloudflared
+          chmod +x cloudflared
+          sudo mv cloudflared /usr/local/bin/cloudflared
+
+      - name: Start Cloudflare Quick Tunnel
+        run: |
+          cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5001 > cloudflared.log 2>&1 &
+          echo $! > cloudflared.pid
+
+      - name: Wait for public tunnel URL
+        run: |
+          for attempt in $(seq 1 60); do
+            TUNNEL_URL=$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' cloudflared.log | head -n 1 || true)
+            if [ -n "$TUNNEL_URL" ]; then
+              echo "Cloudflare tunnel is ready: $TUNNEL_URL"
+              {
+                echo "## Wisp tunnel"
+                echo
+                echo "Temporary public URL: $TUNNEL_URL"
+                echo
+                echo "WebSocket endpoint: `wss://${TUNNEL_URL#https://}/`"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Cloudflare tunnel did not provide a URL:"
+          cat cloudflared.log
+          exit 1
+
+      - name: Keep Wisp and tunnel online for 3 hours
+        run: sleep 10800
+
+      - name: Stop Wisp and tunnel
         if: always()
         run: |
+          if [ -f cloudflared.pid ]; then
+            kill "$(cat cloudflared.pid)" || true
+          fi
           if [ -f wisp.pid ]; then
             kill "$(cat wisp.pid)" || true
           fi
