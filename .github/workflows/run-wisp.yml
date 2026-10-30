@@ -1,4 +1,4 @@
-name: Run Wisp Server
+name: Run Wisp Browser
 
 on:
   workflow_dispatch:
@@ -20,24 +20,32 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Install Wisp dependencies
         run: npm install
 
-      - name: Start Wisp server
+      - name: Install browser dependencies
+        working-directory: browser
+        run: npm install
+
+      - name: Build Scramjet browser
+        working-directory: browser
+        run: npm run build
+
+      - name: Start browser and Wisp server
         run: |
           npm start > wisp.log 2>&1 &
           echo $! > wisp.pid
 
-      - name: Wait for Wisp health
+      - name: Wait for service health
         run: |
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:5001/health; then
-              echo "Wisp server is responding."
+              echo "Browser and Wisp server are responding."
               exit 0
             fi
             sleep 1
           done
-          echo "Wisp server failed to start:"
+          echo "Server failed to start:"
           cat wisp.log
           exit 1
 
@@ -54,19 +62,21 @@ jobs:
           cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5001 > cloudflared.log 2>&1 &
           echo $! > cloudflared.pid
 
-      - name: Wait for public tunnel URL
+      - name: Publish browser and Wisp URLs
         run: |
           for attempt in $(seq 1 60); do
             TUNNEL_URL=$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' cloudflared.log | head -n 1 || true)
             if [ -n "$TUNNEL_URL" ]; then
-              echo "Cloudflare tunnel is ready: $TUNNEL_URL"
               {
-                echo "## Wisp tunnel"
+                echo "## WispProxy Browser"
                 echo
-                echo "Temporary public URL: $TUNNEL_URL"
+                echo "Browser: $TUNNEL_URL"
                 echo
-                printf "WebSocket endpoint: wss://%s/\\n" "${TUNNEL_URL#https://}"
+                printf "Wisp WebSocket: wss://%s/\n" "${TUNNEL_URL#https://}"
+                echo
+                echo "Paste the Wisp WebSocket URL into the browser's connection field."
               } >> "$GITHUB_STEP_SUMMARY"
+              echo "Browser URL: $TUNNEL_URL"
               exit 0
             fi
             sleep 2
@@ -75,10 +85,10 @@ jobs:
           cat cloudflared.log
           exit 1
 
-      - name: Keep Wisp and tunnel online for 3 hours
+      - name: Keep browser and tunnel online for 3 hours
         run: sleep 10800
 
-      - name: Stop Wisp and tunnel
+      - name: Stop services
         if: always()
         run: |
           if [ -f cloudflared.pid ]; then
