@@ -1,81 +1,19 @@
 <!doctype html>
 <html lang="en">
-<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WispProxy Offline Browser</title>
+<title>WispProxy</title>
 <style>
-  :root{color-scheme:light dark;font:16px system-ui,sans-serif}
-  body{margin:0;padding:18px;box-sizing:border-box}
-  main{max-width:1100px;margin:auto}
-  h1{font-size:1.4rem;margin:0 0 14px}
-  form{display:flex;gap:8px;margin:10px 0}
-  input{box-sizing:border-box;flex:1;min-width:0;padding:12px;border:1px solid #888;border-radius:7px;font:inherit}
-  button{padding:10px 18px;border:0;border-radius:7px;font:inherit;cursor:pointer}
-  #status{min-height:1.5em}
-  iframe{width:100%;height:75vh;border:1px solid #888;border-radius:8px;background:white}
-  @media(max-width:600px){form{flex-wrap:wrap}button{width:100%}}
+body{font:16px system-ui;margin:12px}input{padding:9px;min-width:0;flex:1}form{display:flex;gap:6px;margin:8px 0}iframe{width:100%;height:80vh;border:0}
 </style>
-</head>
-<body>
-<main>
-  <h1>WispProxy Browser — Standalone HTML</h1>
-  <form id="connectForm">
-    <input id="wisp" type="url" placeholder="Wisp WebSocket URL (wss://…trycloudflare.com)" aria-label="Wisp WebSocket URL" required>
-    <button type="submit">Connect</button>
-  </form>
-  <form id="browseForm">
-    <input id="address" type="text" placeholder="Website address, e.g. example.com" aria-label="Website address" required>
-    <button type="submit">Go</button>
-  </form>
-  <p id="status" role="status">Enter the Wisp URL from the running GitHub Actions workflow, then connect.</p>
-  <iframe id="viewer" title="Website view" hidden></iframe>
-</main>
+<form id="connect"><input id="wisp" placeholder="Wisp WSS URL" required><button>Connect</button></form>
+<form id="browse"><input id="url" placeholder="Website address" required><button>Go</button></form>
+<iframe id="view"></iframe>
 <script>
-const wispField=document.querySelector("#wisp");
-const addressField=document.querySelector("#address");
-const viewer=document.querySelector("#viewer");
-const status=document.querySelector("#status");
-let connected=false;
-function cleanEndpoint(value){
-  const endpoint=new URL(value.trim());
-  if(!["wss:","ws:"].includes(endpoint.protocol)) throw new Error("Use a WSS or WS WebSocket URL.");
-  endpoint.protocol=endpoint.protocol==="wss:"?"https:":"http:";
-  endpoint.pathname="/";endpoint.search="";endpoint.hash="";
-  return endpoint;
-}
-function normalizeAddress(value){
-  const input=value.trim();
-  if(!input) throw new Error("Enter a website address.");
-  if(/^https?:\/\//i.test(input)) return input;
-  if(/^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(input)) return "https://"+input;
-  return "https://www.google.com/search?q="+encodeURIComponent(input);
-}
-document.querySelector("#connectForm").addEventListener("submit",event=>{
-  event.preventDefault();
-  try{
-    const endpoint=wispField.value.trim();
-    const origin=cleanEndpoint(endpoint).origin;
-    const target=addressField.value.trim()?normalizeAddress(addressField.value):"";
-    const params=new URLSearchParams({embedded:"1",wisp:endpoint});
-    if(target) params.set("url",target);
-    viewer.src=origin+"/?"+params.toString();
-    viewer.hidden=false;
-    connected=true;
-    status.textContent="Connected interface loaded. Enter a site address below to browse.";
-  }catch(error){status.textContent="Could not connect: "+(error.message||String(error))}
-});
-document.querySelector("#browseForm").addEventListener("submit",event=>{
-  event.preventDefault();
-  try{
-    if(!connected||!viewer.src) throw new Error("Connect to Wisp first.");
-    const endpoint=wispField.value.trim();
-    const origin=cleanEndpoint(endpoint).origin;
-    const params=new URLSearchParams({embedded:"1",wisp:endpoint,url:normalizeAddress(addressField.value)});
-    viewer.src=origin+"/?"+params.toString();
-    status.textContent="Loading "+normalizeAddress(addressField.value);
-  }catch(error){status.textContent=error.message||String(error)}
-});
+const w=document.querySelector("#wisp"),u=document.querySelector("#url"),v=document.querySelector("#view");
+function address(s){s=s.trim();return /^https?:\/\//i.test(s)?s:/^[\w.-]+\.[a-z]{2,}/i.test(s)?"https://"+s:"https://www.google.com/search?q="+encodeURIComponent(s)}
+function open(){const e=new URL(w.value.trim());if(!/^wss?:$/.test(e.protocol))throw Error("Use ws:// or wss://");e.protocol=e.protocol==="wss:"?"https:":"http:";e.pathname="/";e.search=e.hash="";const p=new URLSearchParams({embedded:"1",wisp:w.value.trim(),url:address(u.value)});v.src=e+"?"+p}
+document.querySelector("#connect").onsubmit=e=>{e.preventDefault();try{open()}catch(x){alert(x.message)}};
+document.querySelector("#browse").onsubmit=e=>{e.preventDefault();try{open()}catch(x){alert(x.message)}};
 </script>
-</body>
 </html>
