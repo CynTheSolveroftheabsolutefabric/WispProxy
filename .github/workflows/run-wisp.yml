@@ -31,6 +31,14 @@ jobs:
         working-directory: browser
         run: npm run build
 
+      - name: Inspect Scramjet build output
+        working-directory: browser
+        run: |
+          echo "Files in Scramjet output:"
+          find dist/scram -maxdepth 3 -type f | sort
+          echo "Checking expected entrypoint:"
+          test -f dist/scram/scramjet.js && echo "FOUND" || echo "MISSING"
+
       - name: Start browser and Wisp server
         run: |
           npm start > wisp.log 2>&1 &
