@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wisp Connection Tester</title>
+<h1>Wisp Connection Tester</h1>
+<label>WebSocket endpoint <input id="url" value="wss://YOUR-TUNNEL.trycloudflare.com/" size="48"></label>
+<button id="connect">Connect</button>
+<pre id="status">Not connected</pre>
+<script type="module">
+import { client as wisp } from "https://esm.sh/@mercuryworkshop/wisp-js/client";
+const status = document.querySelector("#status");
+document.querySelector("#connect").onclick = () => {
+  status.textContent = "Connecting…";
+  try {
+    const connection = new wisp.ClientConnection(document.querySelector("#url").value.trim());
+    connection.onopen = () => status.textContent = "Wisp connection ready";
+    connection.onerror = () => status.textContent = "Connection error";
+    connection.onclose = () => status.textContent = "Connection closed";
+  } catch (error) { status.textContent = String(error); }
+};
+</script>
+</html>
