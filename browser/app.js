@@ -3,10 +3,23 @@ const endpointInput = document.querySelector("#wisp");
 const addressInput = document.querySelector("#address");
 const status = document.querySelector("#status");
 const iframe = document.querySelector("#page");
+const params = new URLSearchParams(location.search);
+const embedded = params.get("embedded") === "1";
 let controller;
 let frame;
 
-endpointInput.value = localStorage.getItem("wisp-endpoint") || "";
+if (embedded) {
+  document.querySelector("#settings").hidden = true;
+  document.querySelector("#navigate").hidden = true;
+  document.querySelector("h2").hidden = true;
+  document.body.style.padding = "0";
+  document.querySelector("main").style.margin = "0";
+  status.hidden = true;
+  iframe.style.height = "100vh";
+  iframe.style.border = "0";
+}
+
+endpointInput.value = params.get("wisp") || localStorage.getItem("wisp-endpoint") || "";
 
 function normalizeAddress(value) {
   const text = value.trim();
@@ -47,6 +60,13 @@ async function connect(endpoint) {
   status.textContent = "Connected to Wisp. Enter a URL above to browse.";
 }
 
+function browse(value) {
+  if (!frame) throw new Error("Connect to Wisp first.");
+  const url = normalizeAddress(value);
+  status.textContent = "Loading " + url;
+  frame.go(url);
+}
+
 document.querySelector("#settings").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
@@ -59,15 +79,19 @@ document.querySelector("#settings").addEventListener("submit", async (event) => 
 document.querySelector("#navigate").addEventListener("submit", (event) => {
   event.preventDefault();
   try {
-    if (!frame) throw new Error("Connect to Wisp first.");
-    const url = normalizeAddress(addressInput.value);
-    status.textContent = "Loading " + url;
-    frame.go(url);
+    browse(addressInput.value);
   } catch (error) {
     status.textContent = error?.message || String(error);
   }
 });
 
-if (!("serviceWorker" in navigator)) {
+if (embedded && endpointInput.value && params.get("url")) {
+  connect(endpointInput.value).then(() => browse(params.get("url"))).catch((error) => {
+    status.hidden = false;
+    status.textContent = "Connection failed: " + (error?.message || String(error));
+  });
+}
+
+if (!( "serviceWorker" in navigator)) {
   status.textContent = "This browser does not support service workers. Open this site over HTTPS.";
 }
