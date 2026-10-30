@@ -1,10 +1,6 @@
 name: Run Wisp Server
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -69,7 +65,7 @@ jobs:
                 echo
                 echo "Temporary public URL: $TUNNEL_URL"
                 echo
-                echo "WebSocket endpoint: `wss://${TUNNEL_URL#https://}/`"
+                printf "WebSocket endpoint: wss://%s/\\n" "${TUNNEL_URL#https://}"
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
