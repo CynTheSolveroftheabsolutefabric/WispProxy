@@ -1,0 +1,54 @@
+name: Run Wisp Server
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-wisp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Start Wisp server
+        run: |
+          npm start > wisp.log 2>&1 &
+          echo $! > wisp.pid
+
+      - name: Wait for server health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5001/health; then
+              echo "Wisp server is responding."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Wisp server failed to start:"
+          cat wisp.log
+          exit 1
+
+      - name: Stop Wisp server
+        if: always()
+        run: |
+          if [ -f wisp.pid ]; then
+            kill "$(cat wisp.pid)" || true
+          fi
